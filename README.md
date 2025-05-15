@@ -40,7 +40,7 @@ A Node.js backend microservice that handles authenticated file uploads, stores a
    NODE_ENV=development
    JWT_SECRET=your_jwt_secret_key_change_in_production
    JWT_EXPIRATION=1h
-   DATABASE_URL=postgresql://neondb_owner:npg_Sb2hqIzFkmW1@ep-long-credit-a4tky8rx-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require
+   DATABASE_URL=your_database_url
    UPLOAD_LIMIT=5mb
    REDIS_HOST=localhost
    REDIS_PORT=6379
