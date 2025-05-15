@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload Service Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .card {
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .file-list {
+            list-style: none;
+            padding: 0;
+        }
+        .file-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .file-item:hover {
+            background-color: #f5f5f5;
+        }
+        .hidden {
+            display: none;
+        }
+        .tab-buttons {
+            margin-bottom: 20px;
+        }
+        .tab-button {
+            background-color: #f1f1f1;
+            border: none;
+            color: #333;
+            padding: 10px 20px;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+        .tab-button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        #token-status {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .status-logged-in {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .status-logged-out {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+    </style>
+</head>
+<body>
+    <h1>File Upload Service Tester</h1>
+    
+    <div id="token-status" class="status-logged-out">
+        Not logged in
+    </div>
+    
+    <div class="tab-buttons">
+        <button class="tab-button active" onclick="showTab('auth-tab')">Authentication</button>
+        <button class="tab-button" onclick="showTab('upload-tab')">Upload File</button>
+        <button class="tab-button" onclick="showTab('files-tab')">View Files</button>
+    </div>
+    
+    <div id="auth-tab" class="tab">
+        <div class="card">
+            <h2>Register</h2>
+            <div class="form-group">
+                <label for="register-email">Email:</label>
+                <input type="email" id="register-email" placeholder="Enter your email">
+            </div>
+            <div class="form-group">
+                <label for="register-password">Password:</label>
+                <input type="password" id="register-password" placeholder="Enter your password">
+            </div>
+            <button onclick="register()">Register</button>
+            <pre id="register-result"></pre>
+        </div>
+        
+        <div class="card">
+            <h2>Login</h2>
+            <div class="form-group">
+                <label for="login-email">Email:</label>
+                <input type="email" id="login-email" placeholder="Enter your email">
+            </div>
+            <div class="form-group">
+                <label for="login-password">Password:</label>
+                <input type="password" id="login-password" placeholder="Enter your password">
+            </div>
+            <button onclick="login()">Login</button>
+            <pre id="login-result"></pre>
+        </div>
+    </div>
+    
+    <div id="upload-tab" class="tab hidden">
+        <div class="card">
+            <h2>Upload File</h2>
+            <div class="form-group">
+                <label for="file">Select File:</label>
+                <input type="file" id="file">
+            </div>
+            <div class="form-group">
+                <label for="title">Title (optional):</label>
+                <input type="text" id="title" placeholder="Enter file title">
+            </div>
+            <div class="form-group">
+                <label for="description">Description (optional):</label>
+                <textarea id="description" placeholder="Enter file description" rows="3"></textarea>
+            </div>
+            <button onclick="uploadFile()">Upload</button>
+            <pre id="upload-result"></pre>
+        </div>
+    </div>
+    
+    <div id="files-tab" class="tab hidden">
+        <div class="card">
+            <h2>Your Files</h2>
+            <button onclick="getFiles()">Refresh Files</button>
+            <ul id="file-list" class="file-list">
+                <!-- Files will be listed here -->
+            </ul>
+            <div id="pagination" class="hidden">
+                <button onclick="prevPage()">Previous</button>
+                <span id="page-info">Page 1</span>
+                <button onclick="nextPage()">Next</button>
+            </div>
+        </div>
+        
+        <div class="card hidden" id="file-details">
+            <h2>File Details</h2>
+            <pre id="file-details-content"></pre>
+        </div>
+    </div>
+    
+    <script>
+        // Global variables
+        let token = localStorage.getItem('token');
+        let currentPage = 1;
+        let totalPages = 1;
+        
+        // Check token status on page load
+        window.onload = function() {
+            updateTokenStatus();
+        };
+        
+        // Update token status display
+        function updateTokenStatus() {
+            const statusElement = document.getElementById('token-status');
+            if (token) {
+                statusElement.textContent = 'Logged in';
+                statusElement.className = 'status-logged-in';
+            } else {
+                statusElement.textContent = 'Not logged in';
+                statusElement.className = 'status-logged-out';
+            }
+        }
+        
+        // Show selected tab
+        function showTab(tabId) {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            document.getElementById(tabId).classList.remove('hidden');
+            
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+        
+        // Register function
+        async function register() {
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            
+            if (!email || !password) {
+                document.getElementById('register-result').textContent = 'Please enter email and password';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                document.getElementById('register-result').textContent = JSON.stringify(data, null, 2);
+                
+                if (response.ok) {
+                    // Auto-fill login fields
+                    document.getElementById('login-email').value = email;
+                    document.getElementById('login-password').value = password;
+                }
+            } catch (error) {
+                document.getElementById('register-result').textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        // Login function
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            if (!email || !password) {
+                document.getElementById('login-result').textContent = 'Please enter email and password';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                document.getElementById('login-result').textContent = JSON.stringify(data, null, 2);
+                
+                if (response.ok && data.token) {
+                    token = data.token;
+                    localStorage.setItem('token', token);
+                    updateTokenStatus();
+                }
+            } catch (error) {
+                document.getElementById('login-result').textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        // Upload file function
+        async function uploadFile() {
+            if (!token) {
+                document.getElementById('upload-result').textContent = 'Please login first';
+                return;
+            }
+            
+            const fileInput = document.getElementById('file');
+            if (!fileInput.files[0]) {
+                document.getElementById('upload-result').textContent = 'Please select a file';
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            const title = document.getElementById('title').value;
+            if (title) {
+                formData.append('title', title);
+            }
+            
+            const description = document.getElementById('description').value;
+            if (description) {
+                formData.append('description', description);
+            }
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                document.getElementById('upload-result').textContent = JSON.stringify(data, null, 2);
+                
+                if (response.ok) {
+                    // Clear form
+                    fileInput.value = '';
+                    document.getElementById('title').value = '';
+                    document.getElementById('description').value = '';
+                }
+            } catch (error) {
+                document.getElementById('upload-result').textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        // Get files function
+        async function getFiles() {
+            if (!token) {
+                document.getElementById('file-list').innerHTML = '<li>Please login first</li>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/files?page=${currentPage}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const fileList = document.getElementById('file-list');
+                    fileList.innerHTML = '';
+                    
+                    if (data.files.length === 0) {
+                        fileList.innerHTML = '<li>No files found</li>';
+                    } else {
+                        data.files.forEach(file => {
+                            const li = document.createElement('li');
+                            li.className = 'file-item';
+                            li.textContent = `${file.title || file.originalFilename} (${file.status})`;
+                            li.onclick = () => getFileDetails(file.id);
+                            fileList.appendChild(li);
+                        });
+                    }
+                    
+                    // Update pagination
+                    if (data.pagination) {
+                        totalPages = data.pagination.totalPages;
+                        document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+                        document.getElementById('pagination').classList.remove('hidden');
+                    }
+                } else {
+                    document.getElementById('file-list').innerHTML = `<li>Error: ${data.message}</li>`;
+                }
+            } catch (error) {
+                document.getElementById('file-list').innerHTML = `<li>Error: ${error.message}</li>`;
+            }
+        }
+        
+        // Get file details function
+        async function getFileDetails(fileId) {
+            if (!token) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/files/${fileId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('file-details-content').textContent = JSON.stringify(data, null, 2);
+                    document.getElementById('file-details').classList.remove('hidden');
+                } else {
+                    document.getElementById('file-details-content').textContent = `Error: ${data.message}`;
+                    document.getElementById('file-details').classList.remove('hidden');
+                }
+            } catch (error) {
+                document.getElementById('file-details-content').textContent = `Error: ${error.message}`;
+                document.getElementById('file-details').classList.remove('hidden');
+            }
+        }
+        
+        // Pagination functions
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                getFiles();
+            }
+        }
+        
+        function nextPage() {
+            if (currentPage < totalPages) {
+                currentPage++;
+                getFiles();
+            }
+        }
+    </script>
+</body>
+</html>

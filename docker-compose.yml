@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # Database initialization
+  init-db:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sh /app/scripts/init-db.sh
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/file_upload_db?schema=public
+    depends_on:
+      - postgres
+    restart: on-failure
+
+  # Main application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - JWT_SECRET=your_jwt_secret_key_change_in_production
+      - JWT_EXPIRATION=1h
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/file_upload_db?schema=public
+      - UPLOAD_LIMIT=5mb
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      - postgres
+      - redis
+      - init-db
+    restart: unless-stopped
+
+  # Worker process
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      - NODE_ENV=development
+      - JWT_SECRET=your_jwt_secret_key_change_in_production
+      - JWT_EXPIRATION=1h
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/file_upload_db?schema=public
+      - UPLOAD_LIMIT=5mb
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      - postgres
+      - redis
+      - app
+    restart: unless-stopped
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=file_upload_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Redis for BullMQ
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
